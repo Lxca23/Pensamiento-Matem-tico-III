@@ -361,15 +361,16 @@
             background-color: #1d4ed8;
         }
 
+        /* Ajustes de dimensiones y espaciados para evitar cortes verticales en la imagen */
         #certificate-container {
             position: absolute;
             left: -9999px;
             top: -9999px;
             width: 600px;
-            height: 400px;
+            height: 480px; 
             background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
             color: white;
-            padding: 40px;
+            padding: 30px 40px; 
             box-sizing: border-box;
             border: 8px solid #e2e8f0;
             border-radius: 10px;
@@ -394,7 +395,7 @@
         }
 
         .cert-body {
-            margin: 20px 0;
+            margin: 15px 0; 
         }
 
         .cert-body .name {
@@ -867,12 +868,10 @@
 
         // 3. Ocultación y protección de código contra herramientas de desarrollo comunes
         document.addEventListener('keydown', function(event) {
-            // Deshabilitar F12
             if (event.key === 'F12') {
                 event.preventDefault();
                 return false;
             }
-            // Deshabilitar Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
             if (event.ctrlKey && (event.shiftKey && (event.key === 'I' || event.key === 'J' || event.key === 'i' || event.key === 'j') || event.key === 'U' || event.key === 'u')) {
                 event.preventDefault();
                 return false;
@@ -908,11 +907,6 @@
         let timerInterval;
 
         window.onload = function() {
-            // Inicializar la fecha del día actual de forma automática
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('exam-date').value = today;
-
-            // Comprobar si el equipo local ya fue bloqueado
             if (localStorage.getItem('pensamiento_mat_III_blocked') === 'true') {
                 triggerPermanentBlock();
             } else {
@@ -925,6 +919,12 @@
                 if (totalTimeSeconds <= 0) {
                     clearInterval(timerInterval);
                     alert("⏰ ¡El tiempo ha concluido! El examen se enviará de forma automática.");
+                    
+                    // Si expira el tiempo y no pusieron sus datos, les asignamos valores por defecto para no romper el script de imagen
+                    if(!document.getElementById('student-name').value.trim()) document.getElementById('student-name').value = "Tiempo Agotado (Nombre omitido)";
+                    if(!document.getElementById('student-grade').value.trim()) document.getElementById('student-grade').value = "S/G";
+                    if(!document.getElementById('exam-date').value) document.getElementById('exam-date').value = new Date().toISOString().split('T')[0];
+                    
                     evaluateExam();
                 } else {
                     totalTimeSeconds--;
@@ -944,61 +944,74 @@
         }
 
         function evaluateExam() {
-            clearInterval(timerInterval);
+            let nameField = document.getElementById('student-name');
+            let gradeField = document.getElementById('student-grade');
+            let dateField = document.getElementById('exam-date');
 
-            let nameInput = document.getElementById('student-name').value.trim();
-            let gradeInput = document.getElementById('student-grade').value.trim();
-            let dateInput = document.getElementById('exam-date').value;
+            let nameInput = nameField.value.trim();
+            let gradeInput = gradeField.value.trim();
+            let dateInput = dateField.value;
 
-            if (!nameInput || !gradeInput) {
-                alert("⚠️ Por seguridad e identificación institucional, ingresa tu Nombre y Grupo antes de finalizar.");
-                nameInput = nameInput || "Alumno Anónimo";
-                gradeInput = gradeInput || "S/G";
+            // CANDADO DE VALIDACIÓN OBLIGATORIA: Si falta algún dato, detenemos la ejecución.
+            if (!nameInput) {
+                alert("⚠️ CAMPO OBLIGATORIO MISSING:\n\nPor favor, escribe tu Nombre Completo antes de enviar el examen.");
+                nameField.focus();
+                return;
+            }
+            if (!gradeInput) {
+                alert("⚠️ CAMPO OBLIGATORIO MISSING:\n\nPor favor, introduce tu Grupo (ej. 3° A) antes de enviar el examen.");
+                gradeField.focus();
+                return;
+            }
+            if (!dateInput) {
+                alert("⚠️ CAMPO OBLIGATORIO MISSING:\n\nPor favor, selecciona la Fecha de hoy antes de enviar el examen.");
+                dateField.focus();
+                return;
             }
 
+            clearInterval(timerInterval);
             let scoreAcumulado = 0;
             
-            // 1. EVALUAR SECCIÓN TEÓRICA (P1 a P5) -> Cada acierto = 1 punto matemático base
+            // 1. EVALUAR SECCIÓN TEÓRICA (P1 a P5)
             for (let t = 1; t <= 5; t++) {
-                let selectedRadio = document.querySelector(`input[name="theory_q1"]:checked`); // control genérico por bucle manual alterno:
                 let rOption = document.querySelector(`input[name="theory_q${t}"]:checked`);
                 if (rOption && rOption.value === theoryKey[t]) {
                     scoreAcumulado += 1;
                 }
             }
 
-            // 2. EVALUAR SECCIÓN PRÁCTICA (P6 a M17) -> Cada reactivo tiene 2 puntos (1 analítico, 1 gráfico)
+            // 2. EVALUAR SECCIÓN PRÁCTICA (P6 a P17)
             for (let i = 6; i <= 17; i++) {
-                // Validación analítica del input de texto
                 let studentNumAns = document.getElementById(`q${i}`).value.trim().replace(/\s+/g, '');
                 if (practicalKey[i].values.includes(studentNumAns)) {
                     scoreAcumulado += 1;
                 }
 
-                // Validación del radio-botón del tipo de gráfica
                 let selectedRadioG = document.querySelector(`input[name="g${i}"]:checked`);
                 if (selectedRadioG && selectedRadioG.value === practicalKey[i].type) {
                     scoreAcumulado += 1;
                 }
             }
 
-            // PUNTOS MÁXIMOS POSIBLES: 5 (teóricos) + 24 (12 prácticos * 2 puntos c/u) = 29 puntos máximos
             const maxPoints = 29;
             let finalGrade = ((scoreAcumulado / maxPoints) * 10).toFixed(1);
 
-            // Cargar datos al contenedor del comprobante oficial
             document.getElementById('cert-student-name').innerText = nameInput.toUpperCase();
             document.getElementById('cert-student-meta').innerText = "Grupo: " + gradeInput;
             document.getElementById('cert-student-score').innerText = finalGrade + " / 10";
-            document.getElementById('cert-date').innerText = "Fecha: " + (dateInput || new Date().toLocaleDateString());
+            
+            // Formatear fecha para el certificado visual (AAAA-MM-DD a DD/MM/AAAA)
+            let dateParts = dateInput.split('-');
+            let formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : dateInput;
+            document.getElementById('cert-date').innerText = "Fecha: " + formattedDate;
 
             let certContainer = document.getElementById('certificate-container');
             
-            // Renderizado en formato de imagen mediante html2canvas
             html2canvas(certContainer, {
                 scale: 2,
                 logging: false,
-                useCORS: true
+                useCORS: true,
+                allowTaint: true
             }).then(canvas => {
                 let imgData = canvas.toDataURL('image/jpeg', 0.9);
                 
